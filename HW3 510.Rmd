@@ -1,0 +1,70 @@
+---
+title: "HW3"
+author: "qh"
+date: "2/5/2019"
+output: html_document
+---
+Q2
+```{r message=FALSE, warning=FALSE}
+library(Sleuth3) 
+library(MASS) 
+library(ggplot2)
+library(tidyverse)
+data(case0501) 
+attach(case0501)
+```
+
+(a)Boxplot
+```{r}
+case0501 %>% 
+  group_by(Diet) %>% 
+  ggplot(aes(Diet,Lifetime))+
+  geom_boxplot()
+```
+
+(b)(c)
+```{r}
+fullm<-lm(Lifetime~0+Diet,case0501)
+anova(fullm)
+```
+(d)
+```{r}
+reduced<-
+  case0501 %>% 
+  mutate(
+    Diet=as.character(Diet),
+    diet2=ifelse(Diet%in%c("N/R50","R/R50"),"COM",Diet)
+    ) 
+  reducedm<-lm(Lifetime~0+diet2,reduced)
+  anova(reducedm)
+```
+(e)
+```{r}
+  anova(reducedm,fullm)
+```
+
+(g)
+```{r}
+test = function(lmout, C, d = 0) {
+   b = coef(lmout)
+   V = vcov(lmout)
+   dfn = nrow(C)
+   dfd = lmout$df
+   Cb.d = C %*% b - d
+   Fstat = drop(t(Cb.d) %*% solve(C %*% V %*% t(C)) %*% Cb.d / dfn)
+   pvalue = 1 - pf(Fstat, dfn, dfd)
+   list(Fstat = Fstat, pvalue = pvalue)
+
+}
+
+test(fullm, matrix(c(0,0,-1,0,1,0), nrow = 1))
+```
+
+Q3
+```{r}
+A<-matrix(c(0,0,1,2, 0,0,3,4, 4,3,0,0, 2,1,0,0), byrow = TRUE, nrow = 4)
+A
+ginv(A)
+ginv(A)-t(ginv(A))
+```
+
