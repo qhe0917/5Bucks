@@ -1,0 +1,179 @@
+---
+title: "SHIN-Enzyme vs NA"
+author: "qh"
+date: "2/7/2019"
+output: html_document
+---
+#Load all packages
+```{r}
+library(RSepc)
+library(ggplot2)
+library(pracma)
+library(psych)
+library(base)
+library(baseline)
+library(tidyverse)
+library(stats)
+```
+
+#read data
+```{r}
+#READ ORIGINAL DATA
+setwd("/Users/qinghe/Desktop/R/2019/1-30 gpa au-enzyme shin/1-30-2019-pga")
+filenames <- list.files(path = "/Users/qinghe/Desktop/R/2019/1-30 gpa au-enzyme shin/1-30-2019-pga")
+sample<-do.call("cbind", lapply(filenames, read.csv, header = FALSE))
+nrow(sample)
+t = c(1:(2*nfile))
+t = t[c(FALSE,TRUE)]
+t = c(1,t)
+sample.new=sample[,t]
+SN <- sample.new
+colnames(SN)<-c("WtNo",c(1:8))
+#write.table(SN,"/Users/qinghe/Desktop/R/onoin au enzyme/r files/onoinauenzyme.csv",
+#            row.names=FALSE,col.names=FALSE,sep=",")
+
+#COMBINE DATA IN CSV FILE
+FE <- sample.new
+```
+
+#formate
+```{r}
+#RESHAPE
+#after combining, data is then reshaped into the long format
+setwd("/Users/qinghe/Desktop/R/2019/1-30 gpa au-enzyme shin/1-30-2019-pga")
+
+#eliminate file type info ".CSV"
+nfile <- length(filenames)
+nfile
+FN <- unlist(strsplit(filenames, "[.]"))
+FN
+FN1 <- FN[seq(1,2*length(filenames),2)]
+FN.1 <- unlist(strsplit(FN1, "[-]"))
+
+#long form this no/group/sample format can be used by Rsepc
+colnames(FE)<-c("WtNo",FN1)
+library(reshape)
+fe.long<-melt(FE[,2:(nfile + 1)])
+fe.long$variable <- as.character(fe.long$variable)
+x <- unlist(strsplit(fe.long$variable, "[-]"))
+fe.long$class<-x[seq(3,nrow(sample)*4*length(filenames),4)]
+length(filenames)
+group<-x[seq(1,4*length(filenames),4)]
+group <- unlist(strsplit(colnames(FE)[-1], "[-]"))
+groups <- NA
+groups <- group[seq(3, 4*length(filenames),4)]
+fe.long$rep<-x[seq(4, nrow(sample)*4*length(filenames),4)]
+fe.long$WtNo<-NA
+fe.long$WtNo <- rep(FE$WtNo,length(filenames))
+length(fe.long$WtNo)
+colnames(fe.long)<-c("spec.no","Intensity","group","sample","WtNo")
+```
+
+#preprocessing
+```{r}
+#BASELINE CORRECTION
+sp_poly <- baseline_corrt(fe.long, degree = 13, tol = 1e-3, rep = 100)
+#baseline corrrection methods see baseline
+Intensity <- t(sp_poly)
+fe.long$Intensity<-Intensity[,2]
+fe <- head(fe.long,3528)#nrow(sample)
+plot(fe.long$WtNo,fe.long$Intensity,type="l", pch=20,cex =0.1)
+dim(s.fe.long)
+
+#SMOOTHING
+s.fe.long <- smooth_sp(fe.long)
+# check smoothing result
+fe <- head(fe.long,3528)#nrow(sample)
+plot(fe$WtNo,fe$Intensity,type="l")
+s.fe <- head(s.fe.long,3528)
+plot(s.fe$WtNo,s.fe$Intensity,type="l")
+
+```
+
+#NORMALIZATION
+##intensity norm + test
+```{r}
+#NORMALIZATION
+#intensity
+sp_intensity<-intensitynorm_sp(s.fe.long)
+sp_wide_deer <- spread(sp_intensity,WtNo,Intensity)
+
+p <- ttest_sp(sp_intensity)
+tdata <- subset(p, (X1 == "shin")& (X2 == "na"))
+tdata$value[tdata$value >= 0.05] <- 1
+tdata$value[tdata$value < 0.05] <- 0
+
+average1 <- average_sp(sp_intensity, gname = "shin")
+average2 <- average_sp(sp_intensity, gname = "na")
+
+std1 <- std_sp(sp_intensity, gname = "shin")
+std2 <- std_sp(sp_intensity, gname = "na")
+
+avepga <- cbind(average1,average2$`Average Intensity`)
+colnames(avepga) <- c("WtNo","shin","na")
+
+
+matplot(avepga$WtNo,avepga[,c(2,3)],type="l",col = 1:2,lty=1,xlab="WtNo", ylab= "shin/na")
+#matplot(avepga$WtNo,avepga[,c(2,3)],type="l",col = 1:2,lty=1,xlab="WtNo", ylab= "shin/na")
+legend(100,0.8, legend=c("shin","na"),col=1:2, lty=1, cex=0.8)
+lines(tdata$wtno,tdata$value*0.8,type = "l", col = 4)
+```
+
+#NORMALIZATION
+##peak norm + test
+```{r}
+#peak
+sp_peaknorm <- peaknorm_sp(s.fe.long, peak.range = c(800,900))
+sp_wide_deer2 <- spread(sp_peaknorm,WtNo,Intensity)
+
+```
+
+#NORMALIZATION
+##area norm + test
+```{r}
+#area
+sp_areanorm <- areanorm_sp(s.fe.long) 
+sp_wide_deer3 <- spread(sp_areanorm,WtNo,Intensity)
+
+pa <- ttest_sp(sp_areanorm)
+tdataa <- subset(pa, (X1 == "shin")& (X2 == "na"))
+tdataa$value[tdataa$value >= 0.05] <- 1
+tdataa$value[tdataa$value < 0.05] <- 0
+
+averagea1 <- average_sp(sp_areanorm, gname = "shin")
+averagea2 <- average_sp(sp_areanorm, gname = "na")
+
+stda1 <- std_sp(sp_areanorm, gname = "shin")
+stda2 <- std_sp(sp_areanorm, gname = "na")
+
+avepgaa <- cbind(averagea1,averagea2$`Average Intensity`)
+colnames(avepgaa) <- c("WtNo","shin","na")
+
+
+matplot(avepgaa$WtNo,avepgaa[,c(2,3)],type="l",col = 1:2,lty=1,xlab="WtNo", ylab= "shin/na")
+#matplot(avepga$WtNo,avepga[,c(2,3)],type="l",col = 1:2,lty=1,xlab="WtNo", ylab= "shin/na")
+legend(100,8, legend=c("shin","na"),col=1:2, lty=1, cex=0.8)
+lines(tdataa$wtno,tdataa$value*6,type = "l", col = 3)
+#lines(tdata$wtno,tdata$value*6,type = "l", col = 4)
+legend(1000,8, legend=c("area","intensity"),col=3:4, lty=1, cex=0.8)
+
+```
+
+#save processed data(not so useful by now)
+```{r}
+#SAVE NORNALIZED DATA IN
+save<-t(sp_wide_deer$sp)
+save<-data.frame(save)
+length(save)
+save<-save[1:nrow(sample),]
+save$WtNo<-NA
+save$WtNo<-FE$V1
+#write.table(save,"/Users/qinghe/Desktop/R/Substrate hydrolysis/data/norm-int-xyl.CSV",row.names=FALSE,col.names=FALSE,sep=",")
+
+#write.table(s.fe.long,"/Users/qinghe/Desktop/R/Substrate hydrolysis/data/sfelong pga.CSV",row.names=FALSE,col.names=FALSE,sep=",")
+
+#write.table(sp_intensity,"/Users/qinghe/Desktop/R/Substrate hydrolysis/data/norm int pga.CSV",row.names=FALSE,col.names=FALSE,sep=",")
+#write.table(sp_peaknorm,"/Users/qinghe/Desktop/R/Substrate hydrolysis/data/norm peak pga.CSV",row.names=FALSE,col.names=FALSE,sep=",")
+#write.table(sp_areanorm,"/Users/qinghe/Desktop/R/Substrate hydrolysis/data/norm area pga.CSV",row.names=FALSE,col.names=FALSE,sep=",")
+```
+
