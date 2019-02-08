@@ -18,9 +18,9 @@ library(stats)
 
 #read data
 ```{r}
-#READ ORIGINAL DATA
 setwd("/Users/qinghe/Desktop/R/2019/1-30 gpa au-enzyme shin/1-30-2019-pga")
 filenames <- list.files(path = "/Users/qinghe/Desktop/R/2019/1-30 gpa au-enzyme shin/1-30-2019-pga")
+nfile <- length(filenames)
 sample<-do.call("cbind", lapply(filenames, read.csv, header = FALSE))
 nrow(sample)
 t = c(1:(2*nfile))
@@ -31,7 +31,6 @@ SN <- sample.new
 colnames(SN)<-c("WtNo",c(1:8))
 #write.table(SN,"/Users/qinghe/Desktop/R/onoin au enzyme/r files/onoinauenzyme.csv",
 #            row.names=FALSE,col.names=FALSE,sep=",")
-
 #COMBINE DATA IN CSV FILE
 FE <- sample.new
 ```
@@ -43,10 +42,7 @@ FE <- sample.new
 setwd("/Users/qinghe/Desktop/R/2019/1-30 gpa au-enzyme shin/1-30-2019-pga")
 
 #eliminate file type info ".CSV"
-nfile <- length(filenames)
-nfile
 FN <- unlist(strsplit(filenames, "[.]"))
-FN
 FN1 <- FN[seq(1,2*length(filenames),2)]
 FN.1 <- unlist(strsplit(FN1, "[-]"))
 
@@ -78,7 +74,6 @@ Intensity <- t(sp_poly)
 fe.long$Intensity<-Intensity[,2]
 fe <- head(fe.long,3528)#nrow(sample)
 plot(fe.long$WtNo,fe.long$Intensity,type="l", pch=20,cex =0.1)
-dim(s.fe.long)
 
 #SMOOTHING
 s.fe.long <- smooth_sp(fe.long)
@@ -87,11 +82,30 @@ fe <- head(fe.long,3528)#nrow(sample)
 plot(fe$WtNo,fe$Intensity,type="l")
 s.fe <- head(s.fe.long,3528)
 plot(s.fe$WtNo,s.fe$Intensity,type="l")
+```
 
+#Spectrum difference before normalization
+The sample without nanoparticles show higher intensity. This may indicate that the SERS inert species may not be able to be enhanced by SHIN.
+```{r}
+averager1 <- average_sp(s.fe.long , gname = "shin")
+averager2 <- average_sp(s.fe.long , gname = "na")
+avepgar <- cbind(averager1,averager2$`Average Intensity`)
+colnames(avepgar) <- c("WtNo","shin","na")
+
+matplot(avepgar$WtNo,avepgar[,c(2,3)],type="l",col = 1:2,lty=1,xlab="WtNo", ylab= "shin/na")
+legend(100,100, legend=c("shin","na"),col=1:2, lty=1, cex=0.8)
 ```
 
 #NORMALIZATION
+In the following section, the average spectrum for sample PG(substrate) with Au-Enzyme and SHIN mixture and pure PG substrate are calculated. Note that the pure substrate sample without nanoparticles are labeled as NA indicating the absence of nanoparticles.
+
+The t test has been run for each raman shift number. The t test result had been converted to binnary form, all P-value larger than 0.05 are shown as 0, indicating there is no siginifcant difference between 2 groups, and all P-value smaller than 0.05 are shown as 1, indicating siginificant difference between 2 groups. 
+
+The average spectrum and t test result are shown in the same plot to illustrate the spectrum difference. 
+
 ##intensity norm + test
+Normalize based on highest intensity peak. 
+The significant peak difference can be located around 1600 cm-1 (may due to the 4ATP contamination), the peak around 2800 cm-1.
 ```{r}
 #NORMALIZATION
 #intensity
@@ -116,20 +130,44 @@ colnames(avepga) <- c("WtNo","shin","na")
 matplot(avepga$WtNo,avepga[,c(2,3)],type="l",col = 1:2,lty=1,xlab="WtNo", ylab= "shin/na")
 #matplot(avepga$WtNo,avepga[,c(2,3)],type="l",col = 1:2,lty=1,xlab="WtNo", ylab= "shin/na")
 legend(100,0.8, legend=c("shin","na"),col=1:2, lty=1, cex=0.8)
-lines(tdata$wtno,tdata$value*0.8,type = "l", col = 4)
+lines(tdata$wtno,(1-tdata$value)*0.8,type = "l", col = 3)
 ```
 
 #NORMALIZATION
 ##peak norm + test
+Normalize the spectrum with the peak area from 800 to 900 cm-1.
+The significant peak difference can be located around 1600 cm-1 (may due to the 4ATP contamination), the peak around 2800 cm-1
 ```{r}
 #peak
 sp_peaknorm <- peaknorm_sp(s.fe.long, peak.range = c(800,900))
 sp_wide_deer2 <- spread(sp_peaknorm,WtNo,Intensity)
 
+
+pp <- ttest_sp(sp_peaknorm)
+tdatap <- subset(pp, (X1 == "shin")& (X2 == "na"))
+tdatap$value[tdatap$value >= 0.05] <- 1
+tdatap$value[tdatap$value < 0.05] <- 0
+
+averagep1 <- average_sp(sp_peaknorm, gname = "shin")
+averagep2 <- average_sp(sp_peaknorm, gname = "na")
+
+stdp1 <- std_sp(sp_peaknorm, gname = "shin")
+stdp2 <- std_sp(sp_peaknorm, gname = "na")
+
+avepgap <- cbind(averagep1,averagep2$`Average Intensity`)
+colnames(avepgap) <- c("WtNo","shin","na")
+
+
+matplot(avepgap$WtNo,avepga[,c(2,3)],type="l",col = 1:2,lty=1,xlab="WtNo", ylab= "shin/na")
+#matplot(avepga$WtNo,avepga[,c(2,3)],type="l",col = 1:2,lty=1,xlab="WtNo", ylab= "shin/na")
+legend(100,0.8, legend=c("shin","na"),col=1:2, lty=1, cex=0.8)
+lines(tdatap$wtno,(1-tdatap$value)*0.8,type = "l", col = 4)
+
 ```
 
 #NORMALIZATION
 ##area norm + test
+Normalize based on the total peak area. This is not a good way for normalization.
 ```{r}
 #area
 sp_areanorm <- areanorm_sp(s.fe.long) 
@@ -153,27 +191,9 @@ colnames(avepgaa) <- c("WtNo","shin","na")
 matplot(avepgaa$WtNo,avepgaa[,c(2,3)],type="l",col = 1:2,lty=1,xlab="WtNo", ylab= "shin/na")
 #matplot(avepga$WtNo,avepga[,c(2,3)],type="l",col = 1:2,lty=1,xlab="WtNo", ylab= "shin/na")
 legend(100,8, legend=c("shin","na"),col=1:2, lty=1, cex=0.8)
-lines(tdataa$wtno,tdataa$value*6,type = "l", col = 3)
+lines(tdataa$wtno,(1-tdataa$value)*6,type = "l", col = 5)
 #lines(tdata$wtno,tdata$value*6,type = "l", col = 4)
 legend(1000,8, legend=c("area","intensity"),col=3:4, lty=1, cex=0.8)
 
-```
-
-#save processed data(not so useful by now)
-```{r}
-#SAVE NORNALIZED DATA IN
-save<-t(sp_wide_deer$sp)
-save<-data.frame(save)
-length(save)
-save<-save[1:nrow(sample),]
-save$WtNo<-NA
-save$WtNo<-FE$V1
-#write.table(save,"/Users/qinghe/Desktop/R/Substrate hydrolysis/data/norm-int-xyl.CSV",row.names=FALSE,col.names=FALSE,sep=",")
-
-#write.table(s.fe.long,"/Users/qinghe/Desktop/R/Substrate hydrolysis/data/sfelong pga.CSV",row.names=FALSE,col.names=FALSE,sep=",")
-
-#write.table(sp_intensity,"/Users/qinghe/Desktop/R/Substrate hydrolysis/data/norm int pga.CSV",row.names=FALSE,col.names=FALSE,sep=",")
-#write.table(sp_peaknorm,"/Users/qinghe/Desktop/R/Substrate hydrolysis/data/norm peak pga.CSV",row.names=FALSE,col.names=FALSE,sep=",")
-#write.table(sp_areanorm,"/Users/qinghe/Desktop/R/Substrate hydrolysis/data/norm area pga.CSV",row.names=FALSE,col.names=FALSE,sep=",")
 ```
 
